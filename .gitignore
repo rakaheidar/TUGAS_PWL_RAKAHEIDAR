@@ -85,7 +85,7 @@ php_errors.log
 # Composer
 #-------------------------
 vendor/
-!public/niceadmin/vendor/
+!public/NiceAdmin/assets/vendor/
 
 #-------------------------
 # IDE / Development Files
