@@ -57,6 +57,18 @@
         </div>
 
         <div class="col-12">
+            <?= form_label('Kode Voucher', 'voucher_code', ['class' => 'form-label']) ?>
+            <?= form_input([
+                'name'        => 'voucher_code',
+                'id'          => 'voucher_code',
+                'class'       => 'form-control',
+                'placeholder' => 'FLASH10 / FLASH15 / MEMBER20'
+            ]) ?>
+            <small class="text-muted">Tersedia: FLASH10, FLASH15, MEMBER20</small>
+            <div id="voucher_status" class="form-text"></div>
+        </div>
+
+        <div class="col-12">
             <?= form_submit(
                 'submit',
                 'Buat Pesanan',
@@ -104,11 +116,45 @@
 
                 <tr>
                     <td colspan="2"></td>
-                    <td>Total</td>
+                    <td class="text-danger">Diskon Voucher</td>
+                    <td class="text-danger">
+                        <span id="diskon_voucher">- IDR 0</span>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td colspan="2"></td>
+                    <td>PPN (11%)</td>
+                    <td><span id="ppn">IDR 0</span></td>
+                </tr>
+
+                <tr>
+                    <td colspan="2"></td>
+                    <td>Biaya Admin</td>
+                    <td><span id="biaya_admin">IDR 0</span></td>
+                </tr>
+
+                <tr>
+                    <td colspan="2"></td>
+                    <td class="text-success"><strong>Subtotal (+PPN+Admin-Voucher)</strong></td>
+                    <td class="text-success"><strong><span id="subtotal_after">IDR 0</span></strong></td>
+                </tr>
+
+                <tr>
+                    <td colspan="2"></td>
+                    <td>Ongkir</td>
+                    <td><span id="ongkir_display">IDR 0</span></td>
+                </tr>
+
+                <tr>
+                    <td colspan="2"></td>
+                    <td><strong>Grand Total (incl. Ongkir)</strong></td>
                     <td>
-                        <span id="total">
-                            <?= number_to_currency($total, 'IDR') ?>
-                        </span>
+                        <strong>
+                            <span id="total">
+                                <?= number_to_currency($total, 'IDR') ?>
+                            </span>
+                        </strong>
                     </td>
                 </tr>
 
@@ -124,17 +170,67 @@
     <script>
     $(document).ready(function() {
 
+        // harus sama persis dengan app/Helpers/transaksi_helper.php
+        const VOUCHERS = {
+            'FLASH10': 0.10,
+            'FLASH15': 0.15,
+            'MEMBER20': 0.20
+        };
+        const PPN_RATE = 0.11;
+
         let ongkir = 0;
         let subtotal = <?= $total ?>;
+
         hitungTotal();
 
-        function hitungTotal() {
-            let total = subtotal + ongkir;
-
-            $("#ongkir").val(ongkir);
-            $("#total").text(`IDR ${total.toLocaleString('id-ID')}`);
-            $("#total_harga").val(total);
+        function hitungBiayaAdmin(nilai) {
+            if (nilai <= 20000000) return nilai * 0.006;
+            if (nilai <= 40000000) return nilai * 0.008;
+            return nilai * 0.01;
         }
+
+        function formatIDR(nilai) {
+            return `IDR ${Math.round(nilai).toLocaleString('id-ID')}`;
+        }
+
+        function hitungTotal() {
+            const kode = $('#voucher_code').val().trim().toUpperCase();
+            let diskonRate = 0;
+
+            if (kode.length > 0) {
+                if (VOUCHERS.hasOwnProperty(kode)) {
+                    diskonRate = VOUCHERS[kode];
+                    $('#voucher_status').removeClass('text-danger').addClass('text-success')
+                        .text(`Voucher valid: diskon ${diskonRate * 100}%`);
+                } else {
+                    $('#voucher_status').removeClass('text-success').addClass('text-danger')
+                        .text('Kode voucher tidak valid');
+                }
+            } else {
+                $('#voucher_status').removeClass('text-success text-danger').text('');
+            }
+
+            const diskonVoucher = subtotal * diskonRate;
+            const ppn = subtotal * PPN_RATE;
+            const biayaAdmin = hitungBiayaAdmin(subtotal);
+
+            const subtotalAfter = subtotal - diskonVoucher + ppn + biayaAdmin;
+            const grandTotal = subtotalAfter + ongkir;
+
+            $('#diskon_voucher').text(`- ${formatIDR(diskonVoucher)}`);
+            $('#ppn').text(formatIDR(ppn));
+            $('#biaya_admin').text(formatIDR(biayaAdmin));
+            $('#subtotal_after').text(formatIDR(subtotalAfter));
+            $('#ongkir_display').text(formatIDR(ongkir));
+            $('#total').text(formatIDR(grandTotal));
+
+            $('#ongkir').val(ongkir);
+            $('#total_harga').val(grandTotal);
+        }
+
+        $('#voucher_code').on('input', function() {
+            hitungTotal();
+        });
 
         $('#kelurahan').select2({
             placeholder: 'Cari daerah tujuan',

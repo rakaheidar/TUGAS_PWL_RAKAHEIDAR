@@ -17,7 +17,7 @@ protected $transactionDetailModel;
 
     public function __construct()
     {
-        helper(['number', 'form']);
+        helper(['number', 'form', 'transaksi']);
         $this->cart = service('cart');
         $this->transactionModel = new TransactionModel();
         $this->transactionDetailModel = new TransactionDetailModel(); 
@@ -171,16 +171,26 @@ public function buy()
         $subtotal += $item['qty'] * $item['price'];
     }
 
-    $ongkir = (int) $this->request->getPost('ongkir');
+    $ongkir      = (int) $this->request->getPost('ongkir');
+$voucherCode = $this->request->getPost('voucher_code');
 
-    $transaction = [
-        'username'    => $this->request->getPost('username'),
-        'alamat'      => $this->request->getPost('alamat'),
-        'ongkir'      => $ongkir,
-        'total_harga' => $subtotal + $ongkir,
-        'status'      => 0, 
-    ];
+$ppn           = hitung_ppn($subtotal);
+$biayaAdmin    = hitung_biaya_admin($subtotal);
+$diskonVoucher = hitung_diskon_voucher($subtotal, $voucherCode);
 
+$grandTotal = $subtotal - $diskonVoucher + $ppn + $biayaAdmin + $ongkir;
+
+$transaction = [
+    'username'       => $this->request->getPost('username'),
+    'alamat'         => $this->request->getPost('alamat'),
+    'ongkir'         => $ongkir,
+    'total_harga'    => $grandTotal,
+    'ppn'            => $ppn,
+    'biaya_admin'    => $biayaAdmin,
+    'voucher_code'   => $diskonVoucher > 0 ? strtoupper(trim($voucherCode)) : null,
+    'diskon_voucher' => $diskonVoucher,
+    'status'         => 0, 
+];
     // insert transaction
     if (!$this->transactionModel->insert($transaction)) {
         $db->transRollback();
